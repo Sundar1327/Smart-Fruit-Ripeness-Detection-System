@@ -1,0 +1,54 @@
+import serial
+import time
+import re
+
+
+PORT = 'COM5'         
+BAUDRATE = 9600
+MAX_READS = 10        
+
+
+try:
+    arduino = serial.Serial(PORT, BAUDRATE, timeout=1)
+    time.sleep(2)  # Wait for Arduino to reset1
+    print(f"✅ Connected to Arduino on {PORT}")
+except Exception as e:
+    print(f"❌ Error connecting to {PORT}: {e}")
+    raise SystemExit
+
+print("\n📡 Collecting sensor data from Arduino...\n")
+
+read_count = 0
+
+while read_count < MAX_READS:
+    line = arduino.readline().decode('utf-8', errors='ignore').strip()
+
+    if line.startswith("Temperature:"):
+        # Extract temperature
+        temp_match = re.search(r"Temperature:\s*([-+]?\d*\.\d+|\d+)", line)
+        temperature = float(temp_match.group(1)) if temp_match else None
+
+        # Read next two lines (humidity & ethanol)
+        humidity_line = arduino.readline().decode('utf-8', errors='ignore').strip()
+        ethanol_line = arduino.readline().decode('utf-8', errors='ignore').strip()
+
+        # Extract values
+        hum_match = re.search(r"Humidity:\s*([-+]?\d*\.\d+|\d+)", humidity_line)
+        humidity = float(hum_match.group(1)) if hum_match else None
+
+        eth_match = re.search(r"Ethanol.*:\s*([-+]?\d*\.\d+|\d+)", ethanol_line)
+        ethanol = float(eth_match.group(1)) if eth_match else None
+
+        # If all valid values are found
+        if temperature is not None and humidity is not None and ethanol is not None:
+            read_count += 1
+            print(f"{read_count}. Temp={temperature}°C | Hum={humidity}% | Ethanol={ethanol}%")
+
+            # --- CLASSIFICATION USING SIMPLE IF ---
+            if ethanol > 40:
+                print("🍌 Status: Rotten\n")
+            else:
+                print("🍌 Status: Fresh\n")
+
+arduino.close()
+print("✅ Data collection complete.")
